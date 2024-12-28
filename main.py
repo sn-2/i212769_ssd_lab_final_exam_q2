@@ -5,8 +5,10 @@ import sqlite3
 from functools import wraps
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_talisman import Talisman
 
 app = Flask(__name__)
+Talisman(app, frame_options='SAMEORIGIN', force_https=False)
 app.secret_key = 'very_insecure_secret_key'  # Intentionally weak secret key
 
 # Add Content Security Policy headers
