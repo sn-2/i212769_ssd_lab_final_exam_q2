@@ -5,6 +5,8 @@ pipeline {
         // Use Python virtual environment
         VENV = 'venv'
         PYTHON_VERSION = '3.11.0'  // Specify desired Python version
+        CONDA_HOME = "${WORKSPACE}/python_install/miniconda3"
+        PATH = "${CONDA_HOME}/bin:${PATH}"
     }
     
     stages {
@@ -16,20 +18,30 @@ pipeline {
                         sh '''
                             if ! command -v python3 &> /dev/null; then
                                 echo "Python not found. Installing Python..."
-                                if command -v apt &> /dev/null; then
-                                    # Debian/Ubuntu
-                                    sudo apt-get update
-                                    sudo apt-get install -y python3 python3-pip python3-venv
-                                elif command -v yum &> /dev/null; then
-                                    # CentOS/RHEL
-                                    sudo yum update -y
-                                    sudo yum install -y python3 python3-pip
-                                else
-                                    echo "Unsupported package manager"
-                                    exit 1
-                                fi
+                                
+                                # Create local installation directory
+                                mkdir -p ${WORKSPACE}/python_install
+                                cd ${WORKSPACE}/python_install
+                                
+                                # Download and install Miniconda (includes Python)
+                                wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+                                bash miniconda.sh -b -p ${WORKSPACE}/python_install/miniconda3
+                                
+                                # Add to PATH
+                                export PATH="${WORKSPACE}/python_install/miniconda3/bin:$PATH"
+                                
+                                # Install required packages
+                                conda install -y python=3.11 pip
+                            else
+                                echo "Python3 found:"
+                                python3 --version
                             fi
-                            python3 --version
+                            
+                            # Ensure pip is available
+                            if ! command -v pip3 &> /dev/null; then
+                                curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+                                python3 get-pip.py --user
+                            fi
                         '''
                     } else {
                         // Windows environment
@@ -53,14 +65,14 @@ pipeline {
                     try {
                         if (isUnix()) {
                             sh """
-                                # Ensure pip and venv are available
-                                python3 -m ensurepip --upgrade || true
-                                python3 -m pip install --upgrade pip
-                                python3 -m pip install virtualenv
+                                # Initialize conda
+                                eval "\$(${CONDA_HOME}/bin/conda 'shell.bash' 'hook')"
                                 
-                                # Create and activate virtual environment
-                                python3 -m venv ${VENV}
-                                . ${VENV}/bin/activate
+                                # Create and activate conda environment
+                                conda create -y -p "${WORKSPACE}/${VENV}" python=3.11
+                                conda activate "${WORKSPACE}/${VENV}"
+                                
+                                # Install requirements
                                 pip install --no-cache-dir -r requirements.txt
                             """
                         } else {
@@ -89,7 +101,8 @@ pipeline {
                     try {
                         if (isUnix()) {
                             sh """
-                                . ${VENV}/bin/activate
+                                eval "\$(${CONDA_HOME}/bin/conda 'shell.bash' 'hook')"
+                                conda activate "${WORKSPACE}/${VENV}"
                                 python run_tests.py
                             """
                         } else {
@@ -112,7 +125,12 @@ pipeline {
             script {
                 // Clean up virtual environment
                 if (isUnix()) {
-                    sh "rm -rf ${VENV}"
+                    sh """
+                        eval "\$(${CONDA_HOME}/bin/conda 'shell.bash' 'hook')"
+                        conda deactivate
+                        conda env remove -p "${WORKSPACE}/${VENV}" -y
+                        rm -rf "${WORKSPACE}/python_install"
+                    """
                 } else {
                     bat "rmdir /s /q ${VENV}"
                 }
