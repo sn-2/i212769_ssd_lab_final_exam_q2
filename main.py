@@ -3,9 +3,19 @@ import os
 import subprocess
 import sqlite3
 from functools import wraps
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
 app.secret_key = 'very_insecure_secret_key'  # Intentionally weak secret key
+
+# Initialize Flask-Limiter
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
 
 # In-memory storage for comments (insecure)
 comments = []
@@ -29,8 +39,9 @@ def init_db():
 # Initialize database
 init_db()
 
-# Insecure login without rate limiting
+# Login route with rate limiting
 @app.route('/login', methods=['POST'])
+@limiter.limit("5 per minute")  # Strict limit to prevent brute force
 def login():
     username = request.form.get('username')
     password = request.form.get('password')
@@ -55,8 +66,9 @@ def user_profile(username):
     # No checks for whether this user belongs to the currently authenticated user
     return f"Profile of {username}"
 
-# Command injection vulnerability
+# Command injection vulnerability with rate limiting
 @app.route('/ping', methods=['GET'])
+@limiter.limit("10 per minute")  # Limit to prevent DoS
 def ping():
     ip = request.args.get('ip')
     # Unsafely passing user input to a shell command
@@ -67,8 +79,9 @@ def ping():
     except Exception as e:
         return f"Error: {str(e)}"
 
-# SQL injection vulnerability
+# SQL injection vulnerability with rate limiting
 @app.route('/search')
+@limiter.limit("20 per minute")  # Limit to prevent automated SQL injection attempts
 def search():
     query = request.args.get('q', '')
     # Unsafely incorporating user input into a SQL query
@@ -83,15 +96,17 @@ def search():
     finally:
         connection.close()
 
-# XSS vulnerability
+# XSS vulnerability with rate limiting
 @app.route('/comment', methods=['POST'])
+@limiter.limit("10 per minute")  # Limit to prevent spam
 def comment():
     new_comment = request.form.get('comment', '')
     comments.append(new_comment)  # Storing unescaped comment
     return redirect(url_for('index'))
 
-# Missing function level authorization
+# Missing function level authorization with rate limiting
 @app.route('/admin/delete_user/<user_id>', methods=['POST'])
+@limiter.limit("3 per minute")  # Strict limit on admin actions
 def delete_user(user_id):
     # No checks whether the current user has the right to delete users
     conn = sqlite3.connect('my_database.db')
