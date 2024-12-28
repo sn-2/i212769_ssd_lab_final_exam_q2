@@ -60,8 +60,7 @@
         </form>
         <div id="comments">
           {% if comments %} {% for comment in comments %}
-          <!-- Intentionally rendering unescaped content -->
-          <div class="comment">{{ comment | safe }}</div>
+          <div class="comment">{{ comment }}</div>
           {% endfor %} {% endif %}
         </div>
       </div>

@@ -9,6 +9,22 @@ from flask_limiter.util import get_remote_address
 app = Flask(__name__)
 app.secret_key = 'very_insecure_secret_key'  # Intentionally weak secret key
 
+# Add Content Security Policy headers
+@app.after_request
+def add_security_headers(response):
+    # Strict CSP policy to prevent XSS
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'none'; "  # Deny everything by default
+        "style-src 'self'; "    # Only allow styles from our domain
+        "img-src 'self'; "      # Only allow images from our domain
+        "script-src 'none'; "   # No scripts allowed
+        "frame-src 'none'; "    # No frames allowed
+        "object-src 'none'; "   # No plugins allowed
+        "base-uri 'none'; "     # Prevent changing the base URL
+        "form-action 'self'"    # Forms can only submit to our domain
+    )
+    return response
+
 # Initialize Flask-Limiter
 limiter = Limiter(
     get_remote_address,
