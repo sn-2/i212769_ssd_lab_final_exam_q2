@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Insecure Flask App</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+    <!-- Intentionally not including any security headers or CSP -->
+  </head>
+  <body>
+    <div class="container">
+      <h1>Insecure Flask App</h1>
+
+      <!-- Login Form - No Rate Limiting -->
+      <div class="section">
+        <h2>Login</h2>
+        <form action="/login" method="POST">
+          <input type="text" name="username" placeholder="Username" />
+          <input type="password" name="password" placeholder="Password" />
+          <button type="submit">Login</button>
+        </form>
+      </div>
+
+      <!-- Command Injection Test -->
+      <div class="section">
+        <h2>Ping Test (Command Injection)</h2>
+        <form action="/ping" method="GET">
+          <input
+            type="text"
+            name="ip"
+            placeholder="Enter IP (try: 8.8.8.8; ls)"
+          />
+          <button type="submit">Ping</button>
+        </form>
+      </div>
+
+      <!-- SQL Injection Test -->
+      <div class="section">
+        <h2>User Search (SQL Injection)</h2>
+        <form action="/search" method="GET">
+          <input
+            type="text"
+            name="q"
+            placeholder="Search users (try: ' OR '1'='1)"
+          />
+          <button type="submit">Search</button>
+        </form>
+      </div>
+
+      <!-- XSS Test -->
+      <div class="section">
+        <h2>Comments (XSS)</h2>
+        <form action="/comment" method="POST">
+          <textarea
+            name="comment"
+            placeholder="Enter comment (try: <script>alert('xss')</script>)"
+          ></textarea>
+          <button type="submit">Post Comment</button>
+        </form>
+        <div id="comments">
+          {% if comments %} {% for comment in comments %}
+          <!-- Intentionally rendering unescaped content -->
+          <div class="comment">{{ comment | safe }}</div>
+          {% endfor %} {% endif %}
+        </div>
+      </div>
+
+      <!-- IDOR Test -->
+      <div class="section">
+        <h2>User Profile (IDOR)</h2>
+        <form action="/user/admin" method="GET">
+          <input type="text" name="username" placeholder="Enter username" />
+          <button type="submit">View Profile</button>
+        </form>
+      </div>
+
+      <!-- Admin Panel (Missing Authorization) -->
+      <div class="section">
+        <h2>Admin Panel</h2>
+        <form action="/admin/delete_user/1" method="POST">
+          <input type="text" name="user_id" placeholder="User ID to delete" />
+          <button type="submit">Delete User</button>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>
